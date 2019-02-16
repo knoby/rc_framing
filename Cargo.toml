@@ -1,0 +1,7 @@
+[package]
+name = "rc_framing"
+version = "0.1.0"
+authors = ["knoby <11472032+knoby@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
