@@ -36,7 +36,7 @@ pub mod crc {
 pub mod framing {
 
     /// Framing Constants
-    const END: u8 = 0x00;
+    pub const END: u8 = 0x00;
     const ESC: u8 = 0x33;
     const ESC_END: u8 = 0x34;
     const ESC_ESC: u8 = 0x35;
