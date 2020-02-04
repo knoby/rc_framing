@@ -5,4 +5,4 @@ authors = ["knoby <11472032+knoby@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-heapless = "0.4.2"
+heapless = "0.5.2"

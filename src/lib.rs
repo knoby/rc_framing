@@ -1,4 +1,5 @@
 #![no_std]
+
 pub mod crc {
     /// Calculate the CRC value for a given array of bytes
     /// The function uses CRC-8-CIIT
@@ -36,69 +37,62 @@ pub mod crc {
 pub mod framing {
 
     /// Framing Constants
-    pub const END: u8 = 0x00;
+    pub const END: u8 = 0x32;
     const ESC: u8 = 0x33;
     const ESC_END: u8 = 0x34;
     const ESC_ESC: u8 = 0x35;
 
-    /// Decote the given data using SLIP. Bevor encoding a crc value is appended to the data.the
+    /// Decode the given data using SLIP. Bevor encoding a crc value is appended to the data.the
     /// Returns the length of the data in the output buffer
-    pub fn encode(data: &[u8], output: &mut [u8]) -> Result<usize, ()> {
-        //Create a peekable iterator over the output buffer for safe access to the data
-        let mut iter_out = output.iter_mut();
-
-        let mut len = 0;
+    pub fn encode(
+        data: &heapless::Vec<u8, heapless::consts::U32>,
+        output: &mut heapless::Vec<u8, heapless::consts::U32>,
+    ) -> Result<usize, ()> {
+        // Clear Output
+        output.clear();
 
         // Add Start byte
-        try_add_byte(END, iter_out.next())?;
-        len += 1;
+        output.push(END).map_err(|_| ())?;
 
         // Iterate over the data and apply the slip encoding
         for byte in data.iter() {
             match *byte {
                 END => {
-                    try_add_byte(ESC, iter_out.next())?;
-                    len += 1;
-                    try_add_byte(ESC_END, iter_out.next())?;
-                    len += 1;
+                    output.push(ESC).map_err(|_| ())?;
+                    output.push(ESC_END).map_err(|_| ())?;
                 }
                 ESC => {
-                    try_add_byte(ESC, iter_out.next())?;
-                    len += 1;
-                    try_add_byte(ESC_ESC, iter_out.next())?;
-                    len += 1;
+                    output.push(ESC).map_err(|_| ())?;
+                    output.push(ESC_ESC).map_err(|_| ())?;
                 }
                 _ => {
-                    try_add_byte(*byte, iter_out.next())?;
-                    len += 1;
+                    output.push(*byte).map_err(|_| ())?;
                 }
             };
         }
 
         //Try to add the CRC
-        try_add_byte(super::crc::calc_crc8(data), iter_out.next())?;
-        len += 1;
+        output.push(super::crc::calc_crc8(data)).map_err(|_| ())?;
 
         // Add End byte
-        try_add_byte(END, iter_out.next())?;
-        len += 1;
+        output.push(END).map_err(|_| ())?;
 
-        Ok(len)
+        Ok(output.len())
     }
 
     /// Decode the recived Data. Expects the Data between two END byte of the message.
     /// Returns Err if the buffer is not big enough or the crc failed;
-    pub fn decode(input: &[u8], msg: &mut [u8]) -> Result<usize, ()> {
+    pub fn decode(
+        input: &heapless::Vec<u8, heapless::consts::U32>,
+        msg: &mut heapless::Vec<u8, heapless::consts::U32>,
+    ) -> Result<usize, ()> {
         // Iterator over the Input
         let mut input_iter = input.iter().peekable();
 
-        // length of the message
-        let mut len = 0;
+        // Clear the Output Vector
+        msg.clear();
 
         {
-            // Iterator for storing the msg
-            let mut msg_iter = msg.iter_mut();
-
             // Iterate over the input
             while let Some(&byte) = input_iter.next() {
                 match byte {
@@ -107,12 +101,10 @@ pub mod framing {
                         if let Some(&esc_char) = input_iter.next() {
                             match esc_char {
                                 ESC_END => {
-                                    try_add_byte(END, msg_iter.next())?;
-                                    len += 1;
+                                    msg.push(END).map_err(|_| ())?;
                                 }
                                 ESC_ESC => {
-                                    try_add_byte(ESC, msg_iter.next())?;
-                                    len += 1;
+                                    msg.push(ESC).map_err(|_| ())?;
                                 }
                                 _ => return Err(()),
                             }
@@ -121,36 +113,23 @@ pub mod framing {
                         }
                     }
                     _ => {
-                        try_add_byte(byte, msg_iter.next())?;
-                        len += 1;
+                        msg.push(byte).map_err(|_| ())?;
                     }
                 }
             }
         }
 
         // Check the crc
-        super::crc::check_crc(&msg[..len])?;
+        super::crc::check_crc(msg)?;
 
-        if len >= 1 {
+        if msg.len() >= 1 {
             // Remove the crc Value
-            msg[len - 1] = 0;
-
-            Ok(len - 1)
+            msg.pop();
+            Ok(msg.len())
         } else {
             Err(())
         }
     }
-
-    // Try to write to the iterator and return the result of the operation
-    fn try_add_byte(byte: u8, target: Option<&mut u8>) -> Result<(), ()> {
-        if let Some(dest) = target {
-            *dest = byte;
-            Ok(())
-        } else {
-            Err(())
-        }
-    }
-
 }
 
 #[cfg(test)]
